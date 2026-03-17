@@ -15,13 +15,14 @@
  *  5. Bulk index into Elasticsearch
  */
 
-import "@/env";
 import crypto from "crypto";
 import { esClient } from "@/lib/elasticsearch";
 import { embed } from "@/lib/embedder";
 import type { JobDocument } from "@/types/job";
+import { env } from "@/env";
+import { SKILL_PATTERNS } from "@/types/skills";
 
-const ES_INDEX = process.env.ES_INDEX ?? "jobs";
+const ES_INDEX = env.esIndex;
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -48,53 +49,6 @@ function urlToId(url: string): string {
  * Naively extract skill tokens from description text.
  * Good enough for Phase 1 — replace with an NLP extractor later.
  */
-const SKILL_PATTERNS = [
-  "javascript",
-  "typescript",
-  "python",
-  "java",
-  "go",
-  "rust",
-  "ruby",
-  "php",
-  "react",
-  "vue",
-  "angular",
-  "svelte",
-  "next.js",
-  "nuxt",
-  "remix",
-  "node.js",
-  "express",
-  "fastapi",
-  "django",
-  "rails",
-  "spring",
-  "postgresql",
-  "mysql",
-  "mongodb",
-  "redis",
-  "elasticsearch",
-  "docker",
-  "kubernetes",
-  "aws",
-  "gcp",
-  "azure",
-  "terraform",
-  "graphql",
-  "rest",
-  "grpc",
-  "kafka",
-  "rabbitmq",
-  "machine learning",
-  "deep learning",
-  "tensorflow",
-  "pytorch",
-  "figma",
-  "tailwind",
-  "css",
-  "html",
-];
 
 function extractSkills(text: string): string[] {
   const lower = text.toLowerCase();
@@ -107,22 +61,20 @@ function extractSkills(text: string): string[] {
  * Given a list of source URLs, returns the subset that are NOT already in ES.
  * Uses a terms query — much faster than checking one-by-one.
  */
-async function filterExistingUrls(urls: string[]): Promise<Set<string>> {
-  if (urls.length === 0) return new Set();
+async function filterExistingIds(ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
 
   const result = await esClient.search({
-    index: ES_INDEX,
-    size: urls.length,
-    query: { terms: { source_url: urls } },
-    _source: ["source_url"],
+    index: env.esIndex,
+    size: ids.length,
+    query: { ids: { values: ids } },
+    _source: false, // don't fetch document body — just need the _id
   });
 
-  const existing = new Set<string>();
-  for (const hit of result.hits.hits) {
-    const doc = hit._source as { source_url: string };
-    existing.add(doc.source_url);
-  }
-  return existing;
+  const existingIds = result.hits.hits
+    .map((h) => h._id)
+    .filter((id): id is string => id !== undefined);
+  return new Set(existingIds);
 }
 
 // ─── Source: Remotive ─────────────────────────────────────────────────────────
@@ -286,8 +238,7 @@ function extractSalaryMin(text: string): number | null {
 
 // ─── Bulk Index ───────────────────────────────────────────────────────────────
 
-const EMBED_BATCH_SIZE = 32; // Stay within Jina's rate limits
-
+// In bulkIndex, replace the batched loop with a single embed call:
 async function bulkIndex(jobs: JobDocument[]): Promise<void> {
   if (jobs.length === 0) {
     console.log("   → Nothing to index");
@@ -296,42 +247,27 @@ async function bulkIndex(jobs: JobDocument[]): Promise<void> {
 
   console.log(`\n📦 Embedding and indexing ${jobs.length} jobs...`);
 
-  let indexed = 0;
+  const texts = jobs.map((j) => `${j.title} ${j.description}`.slice(0, 2048));
+  const embeddings = await embed(texts); // embedder.ts handles batching internally
 
-  for (let i = 0; i < jobs.length; i += EMBED_BATCH_SIZE) {
-    const batch = jobs.slice(i, i + EMBED_BATCH_SIZE);
-    const texts = batch.map((j) =>
-      `${j.title} ${j.description}`.slice(0, 2048),
-    );
+  const operations = jobs.flatMap((job, idx) => [
+    { index: { _index: env.esIndex, _id: job.id } },
+    { ...job, embedding: embeddings[idx] },
+  ]);
 
-    // Embed batch
-    const embeddings = await embed(texts);
+  const result = await esClient.bulk({ operations, refresh: false });
 
-    // Build ES bulk body
-    const operations = batch.flatMap((job, idx) => [
-      { index: { _index: ES_INDEX, _id: job.id } },
-      { ...job, embedding: embeddings[idx] },
-    ]);
-
-    const result = await esClient.bulk({ operations, refresh: false });
-
-    if (result.errors) {
-      const failed = result.items.filter((item) => item.index?.error);
-      console.error(`   ⚠️  ${failed.length} bulk errors in batch`);
-      for (const item of failed.slice(0, 3)) {
-        console.error("     ", item.index?.error);
-      }
+  if (result.errors) {
+    const failed = result.items.filter((item) => item.index?.error);
+    console.error(`   ⚠️  ${failed.length} bulk errors`);
+    for (const item of failed.slice(0, 3)) {
+      console.error("     ", item.index?.error);
     }
-
-    indexed += batch.length;
-    console.log(`   ✅ ${indexed}/${jobs.length} indexed`);
   }
 
-  // Flush to make documents immediately searchable
-  await esClient.indices.refresh({ index: ES_INDEX });
-  console.log(`\n🎉 Indexed ${indexed} jobs into "${ES_INDEX}"`);
+  await esClient.indices.refresh({ index: env.esIndex });
+  console.log(`\n🎉 Indexed ${jobs.length} jobs into "${env.esIndex}"`);
 }
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -354,11 +290,8 @@ async function main(): Promise<void> {
   console.log(`\n📊 Total raw jobs fetched: ${rawJobs.length}`);
 
   // Deduplicate
-  const urls = rawJobs.map((j) => j.source_url);
-  const existing = await filterExistingUrls(urls);
-  const newJobs = rawJobs.filter((j) => !existing.has(j.source_url));
-
-  console.log(`🔍 Already in ES: ${existing.size} | New: ${newJobs.length}`);
+  const existingIds = await filterExistingIds(rawJobs.map((j) => j.id));
+  const newJobs = rawJobs.filter((j) => !existingIds.has(j.id));
 
   await bulkIndex(newJobs);
 

@@ -1,21 +1,16 @@
 import "@/env";
+import { env } from "@/env";
 import { esClient } from "@/lib/elasticsearch";
 
-const ES_INDEX = process.env.ES_INDEX ?? "jobs";
-const ES_PERCOLATOR_INDEX =
-  process.env.ES_PERCOLATOR_INDEX ?? "jobs-percolator";
-
-const EMBEDDING_DIMS = parseInt(process.env.EMBEDDING_DIMS ?? "1024", 10);
-
 async function createJobsIndex(): Promise<void> {
-  const exists = await esClient.indices.exists({ index: ES_INDEX });
+  const exists = await esClient.indices.exists({ index: env.esIndex });
   if (exists) {
-    console.log(`ℹ️  Index "${ES_INDEX}" already exists — skipping`);
+    console.log(`Index "${env.esIndex}" already exists — skipping`);
     return;
   }
 
   await esClient.indices.create({
-    index: ES_INDEX,
+    index: env.esIndex,
     mappings: {
       properties: {
         id: { type: "keyword" },
@@ -36,7 +31,7 @@ async function createJobsIndex(): Promise<void> {
         source: { type: "keyword" }, // 'remotive' | 'hn'
         embedding: {
           type: "dense_vector",
-          dims: EMBEDDING_DIMS,
+          dims: env.embeddingDims,
           index: true,
           similarity: "cosine",
         },
@@ -48,23 +43,25 @@ async function createJobsIndex(): Promise<void> {
     },
   });
 
-  console.log(`✅ Created index "${ES_INDEX}" (dims: ${EMBEDDING_DIMS})`);
+  console.log(`✅ Created index "${env.esIndex}" (dims: ${env.embeddingDims})`);
 }
 
 async function createPercolatorIndex(): Promise<void> {
-  const exists = await esClient.indices.exists({ index: ES_PERCOLATOR_INDEX });
+  const exists = await esClient.indices.exists({
+    index: env.esPercolatorIndex,
+  });
   if (exists) {
-    console.log(`ℹ️  Index "${ES_PERCOLATOR_INDEX}" already exists — skipping`);
+    console.log(
+      `Index "${env.esPercolatorIndex}" already exists — skipping`,
+    );
     return;
   }
 
   await esClient.indices.create({
-    index: ES_PERCOLATOR_INDEX,
+    index: env.esPercolatorIndex,
     mappings: {
       properties: {
-        // Required by ES percolator
         query: { type: "percolator" },
-        // Mirror the fields that percolate queries will match against
         title: { type: "text", analyzer: "english" },
         description: { type: "text", analyzer: "english" },
         skills: { type: "text", analyzer: "english" },
@@ -79,7 +76,7 @@ async function createPercolatorIndex(): Promise<void> {
     },
   });
 
-  console.log(`✅ Created index "${ES_PERCOLATOR_INDEX}"`);
+  console.log(`✅ Created index "${env.esPercolatorIndex}"`);
 }
 
 async function main(): Promise<void> {

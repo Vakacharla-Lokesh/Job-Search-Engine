@@ -1,15 +1,16 @@
 {
   "name": "server",
   "module": "index.ts",
+  "description": "Job search engine project",
   "type": "module",
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
     "typecheck": "tsc --noEmit",
-    "setup-index": "bun run scripts/setup-index.ts",
-    "ingest": "bun run scripts/ingest.ts",
-    "ingest:remotive": "bun run scripts/ingest.ts --source remotive",
-    "ingest:hn": "bun run scripts/ingest.ts --source hn"
+    "setup-index": "bun run src/scripts/setup-index.ts",
+    "ingest": "bun run src/scripts/ingest.ts",
+    "ingest:remotive": "bun run src/scripts/ingest.ts --source remotive",
+    "ingest:hn": "bun run src/scripts/ingest.ts --source hn"
   },
   "devDependencies": {
     "@types/bun": "latest",

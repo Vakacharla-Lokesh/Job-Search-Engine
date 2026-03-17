@@ -1,6 +1,9 @@
+import { env } from "@/env";
+
 const JINA_API_URL = "https://api.jina.ai/v1/embeddings";
 const JINA_MODEL = "jina-embeddings-v3";
 const JINA_BATCH_SIZE = 32;
+const JINA_BATCH_DELAY_MS = 700;
 
 interface JinaEmbeddingResponse {
   data: Array<{ embedding: number[] }>;
@@ -8,10 +11,6 @@ interface JinaEmbeddingResponse {
 
 export async function embed(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return [];
-
-  if (!process.env.JINA_API_KEY) {
-    throw new Error("JINA_API_KEY is not set");
-  }
 
   const results: number[][] = [];
 
@@ -22,7 +21,7 @@ export async function embed(texts: string[]): Promise<number[][]> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.JINA_API_KEY}`,
+        Authorization: `Bearer ${env.jinaApiKey}`,
       },
       body: JSON.stringify({ model: JINA_MODEL, input: batch }),
     });
@@ -36,7 +35,7 @@ export async function embed(texts: string[]): Promise<number[][]> {
     results.push(...json.data.map((d) => d.embedding));
 
     if (i + JINA_BATCH_SIZE < texts.length) {
-      await new Promise((resolve) => setTimeout(resolve, 700));
+      await new Promise((resolve) => setTimeout(resolve, JINA_BATCH_DELAY_MS));
     }
   }
 
