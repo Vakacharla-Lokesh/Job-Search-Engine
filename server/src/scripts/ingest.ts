@@ -1,0 +1,375 @@
+/**
+ * Ingestion script — Phase 1
+ * Sources: Remotive API + HN Who's Hiring (via Algolia)
+ *
+ * Usage:
+ *   bun run scripts/ingest.ts
+ *   bun run scripts/ingest.ts --source remotive
+ *   bun run scripts/ingest.ts --source hn
+ *
+ * What it does:
+ *  1. Fetch raw jobs from each source
+ *  2. Normalize to JobDocument (strip HTML, extract fields)
+ *  3. Deduplicate against existing ES documents by source_url
+ *  4. Embed descriptions in batches via Jina AI
+ *  5. Bulk index into Elasticsearch
+ */
+
+import "@/env";
+import crypto from "crypto";
+import { esClient } from "@/lib/elasticsearch";
+import { embed } from "@/lib/embedder";
+import type { JobDocument } from "@/types/job";
+
+const ES_INDEX = process.env.ES_INDEX ?? "jobs";
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+
+/** Strip HTML tags and collapse whitespace. */
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Deterministic ID from a URL — avoids re-indexing the same job. */
+function urlToId(url: string): string {
+  return crypto.createHash("sha256").update(url).digest("hex").slice(0, 16);
+}
+
+/**
+ * Naively extract skill tokens from description text.
+ * Good enough for Phase 1 — replace with an NLP extractor later.
+ */
+const SKILL_PATTERNS = [
+  "javascript",
+  "typescript",
+  "python",
+  "java",
+  "go",
+  "rust",
+  "ruby",
+  "php",
+  "react",
+  "vue",
+  "angular",
+  "svelte",
+  "next.js",
+  "nuxt",
+  "remix",
+  "node.js",
+  "express",
+  "fastapi",
+  "django",
+  "rails",
+  "spring",
+  "postgresql",
+  "mysql",
+  "mongodb",
+  "redis",
+  "elasticsearch",
+  "docker",
+  "kubernetes",
+  "aws",
+  "gcp",
+  "azure",
+  "terraform",
+  "graphql",
+  "rest",
+  "grpc",
+  "kafka",
+  "rabbitmq",
+  "machine learning",
+  "deep learning",
+  "tensorflow",
+  "pytorch",
+  "figma",
+  "tailwind",
+  "css",
+  "html",
+];
+
+function extractSkills(text: string): string[] {
+  const lower = text.toLowerCase();
+  return SKILL_PATTERNS.filter((skill) => lower.includes(skill));
+}
+
+// ─── Deduplication ────────────────────────────────────────────────────────────
+
+/**
+ * Given a list of source URLs, returns the subset that are NOT already in ES.
+ * Uses a terms query — much faster than checking one-by-one.
+ */
+async function filterExistingUrls(urls: string[]): Promise<Set<string>> {
+  if (urls.length === 0) return new Set();
+
+  const result = await esClient.search({
+    index: ES_INDEX,
+    size: urls.length,
+    query: { terms: { source_url: urls } },
+    _source: ["source_url"],
+  });
+
+  const existing = new Set<string>();
+  for (const hit of result.hits.hits) {
+    const doc = hit._source as { source_url: string };
+    existing.add(doc.source_url);
+  }
+  return existing;
+}
+
+// ─── Source: Remotive ─────────────────────────────────────────────────────────
+
+interface RemotiveJob {
+  id: number;
+  url: string;
+  title: string;
+  company_name: string;
+  candidate_required_location: string;
+  description: string;
+  salary: string;
+  publication_date: string;
+  tags: string[];
+}
+
+interface RemotiveResponse {
+  jobs: RemotiveJob[];
+}
+
+async function fetchRemotive(): Promise<JobDocument[]> {
+  console.log("🌐 Fetching Remotive...");
+
+  const res = await fetch("https://remotive.com/api/remote-jobs?limit=500");
+  if (!res.ok) throw new Error(`Remotive fetch failed: ${res.status}`);
+
+  const data = (await res.json()) as RemotiveResponse;
+  console.log(`   → ${data.jobs.length} raw jobs from Remotive`);
+
+  return data.jobs.map((job): JobDocument => {
+    const description = stripHtml(job.description);
+    const salaryMatch = job.salary?.match(
+      /\$?([\d,]+)\s*[-–]\s*\$?([\d,]+)/,
+    )?.[0];
+    const salaryNums = salaryMatch
+      ? salaryMatch.replace(/[$,]/g, "").split(/[-–]/).map(Number)
+      : null;
+
+    return {
+      id: urlToId(job.url),
+      title: job.title,
+      description,
+      company: job.company_name,
+      location: job.candidate_required_location || "Remote",
+      remote: true, // Remotive is remote-only
+      salary_min: salaryNums?.[0] ?? null,
+      salary_max: salaryNums?.[1] ?? null,
+      skills: extractSkills(description),
+      source_url: job.url,
+      posted_at: new Date(job.publication_date).toISOString(),
+      source: "remotive",
+    };
+  });
+}
+
+// ─── Source: HN Who's Hiring ──────────────────────────────────────────────────
+
+interface AlgoliaHit {
+  objectID: string;
+  author: string;
+  comment_text: string | null;
+  created_at: string;
+  story_id: number;
+}
+
+interface AlgoliaResponse {
+  hits: AlgoliaHit[];
+  nbPages: number;
+}
+
+/**
+ * Fetches the current month's "Who is Hiring?" thread from HN via Algolia.
+ * Each top-level comment is one job posting.
+ */
+async function fetchHNWhosHiring(): Promise<JobDocument[]> {
+  console.log("🌐 Fetching HN Who's Hiring...");
+
+  // Find the most recent "Ask HN: Who is hiring?" thread
+  const threadSearch = await fetch(
+    "https://hn.algolia.com/api/v1/search?query=Ask+HN+Who+is+hiring&tags=ask_hn&hitsPerPage=5",
+  );
+  if (!threadSearch.ok)
+    throw new Error(`HN thread search failed: ${threadSearch.status}`);
+
+  const threadData = (await threadSearch.json()) as AlgoliaResponse;
+  const thread = threadData.hits[0];
+  if (!thread) throw new Error("Could not find HN Who is Hiring thread");
+
+  const storyId = thread.story_id ?? parseInt(thread.objectID, 10);
+  console.log(`   → Using HN thread: ${storyId}`);
+
+  // Fetch all top-level comments (each is a job posting), paginating
+  const allJobs: JobDocument[] = [];
+  let page = 0;
+  let totalPages = 1;
+
+  while (page < totalPages) {
+    const res = await fetch(
+      `https://hn.algolia.com/api/v1/search?tags=comment,story_${storyId}&hitsPerPage=200&page=${page}`,
+    );
+    if (!res.ok) throw new Error(`HN comments fetch failed: ${res.status}`);
+
+    const data = (await res.json()) as AlgoliaResponse;
+    totalPages = Math.min(data.nbPages, 5); // Cap at 5 pages (~1000 comments) to be safe
+
+    for (const hit of data.hits) {
+      if (!hit.comment_text || hit.comment_text.length < 100) continue;
+
+      const text = stripHtml(hit.comment_text);
+
+      // Best-effort title extraction: first line is usually "Company | Role | Location"
+      const firstLine = text.split("\n")[0]?.trim() ?? "";
+      const title =
+        firstLine.length > 5 && firstLine.length < 120
+          ? firstLine
+          : "Software Engineer";
+
+      const url = `https://news.ycombinator.com/item?id=${hit.objectID}`;
+
+      const remote =
+        /\bremote\b/i.test(text) || /\bonsite\b/i.test(text) === false;
+
+      allJobs.push({
+        id: urlToId(url),
+        title,
+        description: text.slice(0, 4000), // Cap length — some posts are very long
+        company: hit.author,
+        location: extractLocationFromHN(text),
+        remote,
+        salary_min: extractSalaryMin(text),
+        salary_max: null,
+        skills: extractSkills(text),
+        source_url: url,
+        posted_at: new Date(hit.created_at).toISOString(),
+        source: "hn",
+      });
+    }
+
+    page++;
+  }
+
+  console.log(`   → ${allJobs.length} raw jobs from HN`);
+  return allJobs;
+}
+
+function extractLocationFromHN(text: string): string {
+  const match = text.match(
+    /\b(remote|new york|san francisco|london|berlin|amsterdam|toronto|seattle|austin|chicago|boston|los angeles|bangalore|singapore)\b/i,
+  );
+  return match ? match[0] : "Unknown";
+}
+
+function extractSalaryMin(text: string): number | null {
+  // Match patterns like $120k, $120,000, 120k
+  const match = text.match(/\$\s?([\d]+(?:,[\d]+)?)\s*[kK]?\b/);
+  if (!match?.[1]) return null;
+  const raw = parseInt(match[1].replace(",", ""), 10);
+  // If it looks like thousands (e.g. 120k), multiply up
+  return raw < 1000 ? raw * 1000 : raw;
+}
+
+// ─── Bulk Index ───────────────────────────────────────────────────────────────
+
+const EMBED_BATCH_SIZE = 32; // Stay within Jina's rate limits
+
+async function bulkIndex(jobs: JobDocument[]): Promise<void> {
+  if (jobs.length === 0) {
+    console.log("   → Nothing to index");
+    return;
+  }
+
+  console.log(`\n📦 Embedding and indexing ${jobs.length} jobs...`);
+
+  let indexed = 0;
+
+  for (let i = 0; i < jobs.length; i += EMBED_BATCH_SIZE) {
+    const batch = jobs.slice(i, i + EMBED_BATCH_SIZE);
+    const texts = batch.map((j) =>
+      `${j.title} ${j.description}`.slice(0, 2048),
+    );
+
+    // Embed batch
+    const embeddings = await embed(texts);
+
+    // Build ES bulk body
+    const operations = batch.flatMap((job, idx) => [
+      { index: { _index: ES_INDEX, _id: job.id } },
+      { ...job, embedding: embeddings[idx] },
+    ]);
+
+    const result = await esClient.bulk({ operations, refresh: false });
+
+    if (result.errors) {
+      const failed = result.items.filter((item) => item.index?.error);
+      console.error(`   ⚠️  ${failed.length} bulk errors in batch`);
+      for (const item of failed.slice(0, 3)) {
+        console.error("     ", item.index?.error);
+      }
+    }
+
+    indexed += batch.length;
+    console.log(`   ✅ ${indexed}/${jobs.length} indexed`);
+  }
+
+  // Flush to make documents immediately searchable
+  await esClient.indices.refresh({ index: ES_INDEX });
+  console.log(`\n🎉 Indexed ${indexed} jobs into "${ES_INDEX}"`);
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const sourceArg =
+    args.find((a) => a.startsWith("--source="))?.split("=")[1] ??
+    args[args.indexOf("--source") + 1];
+
+  console.log("🚀 Starting ingestion pipeline\n");
+
+  let rawJobs: JobDocument[] = [];
+
+  if (!sourceArg || sourceArg === "remotive") {
+    rawJobs.push(...(await fetchRemotive()));
+  }
+  if (!sourceArg || sourceArg === "hn") {
+    rawJobs.push(...(await fetchHNWhosHiring()));
+  }
+
+  console.log(`\n📊 Total raw jobs fetched: ${rawJobs.length}`);
+
+  // Deduplicate
+  const urls = rawJobs.map((j) => j.source_url);
+  const existing = await filterExistingUrls(urls);
+  const newJobs = rawJobs.filter((j) => !existing.has(j.source_url));
+
+  console.log(`🔍 Already in ES: ${existing.size} | New: ${newJobs.length}`);
+
+  await bulkIndex(newJobs);
+
+  // Final count
+  const countResult = await esClient.count({ index: ES_INDEX });
+  console.log(`\n📈 Total jobs in index: ${countResult.count}`);
+
+  process.exit(0);
+}
+
+main().catch((err) => {
+  console.error("❌ Ingestion failed:", err);
+  process.exit(1);
+});
