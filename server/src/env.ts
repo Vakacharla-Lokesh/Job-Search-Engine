@@ -35,8 +35,12 @@ const _env = {
   JWT_EXPIRES_IN: optionalEnv("JWT_EXPIRES_IN", "7d"),
 
   // Server
-  PORT: parseInt(optionalEnv("PORT", "3001"), 10),
+  PORT: parseInt(optionalEnv("PORT", "3000"), 10),
   NODE_ENV: optionalEnv("NODE_ENV", "development"),
+
+  // Adzuna
+  ADZUNA_APP_ID: optionalEnv("ADZUNA_APP_ID", ""),
+  ADZUNA_APP_KEY: optionalEnv("ADZUNA_APP_KEY", ""),
 } as const;
 
 export const env = {
@@ -86,5 +90,13 @@ export const env = {
   },
   get isProd() {
     return _env.NODE_ENV === "production";
+  },
+
+  // Adzuna
+  get adzunaAppId() {
+    return _env.ADZUNA_APP_ID;
+  },
+  get adzunaAppKey() {
+    return _env.ADZUNA_APP_KEY;
   },
 } as const;

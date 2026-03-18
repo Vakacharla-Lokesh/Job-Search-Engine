@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import type { SearchFilters } from "@/hooks/useSearchFilter";
+import type { SearchFilters } from "@/hooks/useSearchFilters";
 
 interface Props {
   filters: SearchFilters;

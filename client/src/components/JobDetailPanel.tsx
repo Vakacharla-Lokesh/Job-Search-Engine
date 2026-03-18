@@ -18,6 +18,14 @@ interface Props {
   onClose: () => void;
 }
 
+const SOURCE_LABELS: Record<string, string> = {
+  remotive: "Remotive",
+  hn: "Hacker News",
+  arbeitnow: "Arbeitnow",
+  themuse: "The Muse",
+  adzuna: "Adzuna",
+};
+
 function formatSalary(min: number | null, max: number | null): string | null {
   if (!min && !max) return null;
   const fmt = (n: number) =>
@@ -134,8 +142,7 @@ export default function JobDetailPanel({ jobId, onClose }: Props) {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline"
               >
-                Apply on{" "}
-                {job.source === "remotive" ? "Remotive" : "Hacker News"}
+                Apply on {SOURCE_LABELS[job.source] ?? "job board"}
                 <ExternalLink className="size-3.5" />
               </a>
             </div>

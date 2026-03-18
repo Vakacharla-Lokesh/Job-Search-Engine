@@ -1,5 +1,5 @@
 import { useJobSearch } from "@/hooks/useJobSearch";
-import { useSearchFilters } from "@/hooks/useSearchFilter";
+import { useSearchFilters } from "@/hooks/useSearchFilters";
 import SearchBar from "@/components/SearchBar";
 import FilterPanel from "@/components/FilterPanel";
 import JobList from "@/components/JobList";

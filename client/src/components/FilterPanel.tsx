@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
-import type { SearchFilters } from "@/hooks/useSearchFilter";
+import type { SearchFilters } from "@/hooks/useSearchFilters";
 
 interface Props {
   filters: SearchFilters;

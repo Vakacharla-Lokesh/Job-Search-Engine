@@ -236,6 +236,198 @@ function extractSalaryMin(text: string): number | null {
   return raw < 1000 ? raw * 1000 : raw;
 }
 
+// ─── Source: Arbeitnow ────────────────────────────────────────────────────────
+
+interface ArbeitnowJob {
+  slug: string;
+  url: string;
+  title: string;
+  company_name: string;
+  location: string;
+  remote: boolean;
+  description: string;
+  tags: string[];
+  job_types: string[];
+  publication_date: string;
+}
+
+interface ArbeitnowResponse {
+  data: ArbeitnowJob[];
+}
+
+async function fetchArbeitnow(): Promise<JobDocument[]> {
+  console.log("🌐 Fetching Arbeitnow...");
+  const jobs: JobDocument[] = [];
+
+  // Arbeitnow paginates — fetch first 3 pages (300 jobs max)
+  for (let page = 1; page <= 3; page++) {
+    const res = await fetch(
+      `https://www.arbeitnow.com/api/job-board-api?page=${page}`,
+    );
+    if (!res.ok) break;
+
+    const data = (await res.json()) as ArbeitnowResponse;
+    if (!data.data?.length) break;
+
+    for (const job of data.data) {
+      const description = stripHtml(job.description);
+      jobs.push({
+        id: urlToId(job.url),
+        title: job.title,
+        description,
+        company: job.company_name,
+        location: job.location || "Europe",
+        remote: job.remote,
+        salary_min: null,
+        salary_max: null,
+        skills: extractSkills(description),
+        source_url: job.url,
+        posted_at: new Date(job.publication_date).toISOString(),
+        source: "arbeitnow",
+      });
+    }
+  }
+
+  console.log(`   → ${jobs.length} raw jobs from Arbeitnow`);
+  return jobs;
+}
+
+// ─── Source: The Muse ─────────────────────────────────────────────────────────
+
+interface TheMuseJob {
+  id: number;
+  name: string;
+  contents: string;
+  refs: { landing_page: string };
+  company: { name: string };
+  locations: Array<{ name: string }>;
+  publication_date: string;
+  levels: Array<{ name: string }>;
+}
+
+interface TheMuseResponse {
+  results: TheMuseJob[];
+  total: number;
+}
+
+async function fetchTheMuse(): Promise<JobDocument[]> {
+  console.log("🌐 Fetching The Muse...");
+  const jobs: JobDocument[] = [];
+
+  // The Muse free tier allows up to 500 results — fetch 2 pages of 100
+  for (let page = 1; page <= 5; page++) {
+    const res = await fetch(
+      `https://www.themuse.com/api/public/jobs?page=${page}&per_page=100&category=Software%20Engineer&category=Data%20Science&category=Product%20Management`,
+    );
+    if (!res.ok) break;
+
+    const data = (await res.json()) as TheMuseResponse;
+    if (!data.results?.length) break;
+
+    for (const job of data.results) {
+      const description = stripHtml(job.contents ?? "");
+      const location = job.locations?.[0]?.name ?? "Unknown";
+      const remote = /remote/i.test(location);
+
+      jobs.push({
+        id: urlToId(job.refs.landing_page),
+        title: job.name,
+        description,
+        company: job.company.name,
+        location,
+        remote,
+        salary_min: null,
+        salary_max: null,
+        skills: extractSkills(description),
+        source_url: job.refs.landing_page,
+        posted_at: new Date(job.publication_date).toISOString(),
+        source: "themuse",
+      });
+    }
+  }
+
+  console.log(`   → ${jobs.length} raw jobs from The Muse`);
+  return jobs;
+}
+
+// ─── Source: Adzuna ───────────────────────────────────────────────────────────
+
+interface AdzunaJob {
+  id: string;
+  title: string;
+  description: string;
+  company: { display_name: string };
+  location: { display_name: string };
+  redirect_url: string;
+  created: string;
+  salary_min?: number;
+  salary_max?: number;
+}
+
+interface AdzunaResponse {
+  results: AdzunaJob[];
+}
+
+async function fetchAdzuna(): Promise<JobDocument[]> {
+  if (!env.adzunaAppId || !env.adzunaAppKey) {
+    console.log("⏭️  Skipping Adzuna — ADZUNA_APP_ID/KEY not set");
+    return [];
+  }
+
+  console.log("🌐 Fetching Adzuna...");
+  const jobs: JobDocument[] = [];
+
+  // Fetch from India + global remote — two separate queries
+  const queries = [
+    { country: "in", what: "software engineer", where: "" },
+    { country: "gb", what: "software engineer", where: "remote" },
+    { country: "us", what: "software engineer", where: "" },
+  ];
+
+  for (const q of queries) {
+    const url = new URL(
+      `https://api.adzuna.com/v1/api/jobs/${q.country}/search/1`,
+    );
+    url.searchParams.set("app_id", env.adzunaAppId);
+    url.searchParams.set("app_key", env.adzunaAppKey);
+    url.searchParams.set("results_per_page", "100");
+    url.searchParams.set("what", q.what);
+    if (q.where) url.searchParams.set("where", q.where);
+    url.searchParams.set("content-type", "application/json");
+
+    const res = await fetch(url.toString());
+    if (!res.ok) {
+      console.warn(`   ⚠️  Adzuna ${q.country} fetch failed: ${res.status}`);
+      continue;
+    }
+
+    const data = (await res.json()) as AdzunaResponse;
+    for (const job of data.results ?? []) {
+      const description = stripHtml(job.description);
+      const location = job.location.display_name;
+      const remote = /remote/i.test(location) || /remote/i.test(job.title);
+
+      jobs.push({
+        id: urlToId(job.redirect_url),
+        title: job.title,
+        description,
+        company: job.company.display_name,
+        location,
+        remote,
+        salary_min: job.salary_min ? Math.round(job.salary_min) : null,
+        salary_max: job.salary_max ? Math.round(job.salary_max) : null,
+        skills: extractSkills(description),
+        source_url: job.redirect_url,
+        posted_at: new Date(job.created).toISOString(),
+        source: "adzuna",
+      });
+    }
+  }
+
+  console.log(`   → ${jobs.length} raw jobs from Adzuna`);
+  return jobs;
+}
+
 // ─── Bulk Index ───────────────────────────────────────────────────────────────
 
 // In bulkIndex, replace the batched loop with a single embed call:
@@ -280,22 +472,28 @@ async function main(): Promise<void> {
 
   let rawJobs: JobDocument[] = [];
 
-  if (!sourceArg || sourceArg === "remotive") {
+  if (!sourceArg || sourceArg === "remotive")
     rawJobs.push(...(await fetchRemotive()));
-  }
-  if (!sourceArg || sourceArg === "hn") {
+  if (!sourceArg || sourceArg === "hn")
     rawJobs.push(...(await fetchHNWhosHiring()));
-  }
+  if (!sourceArg || sourceArg === "arbeitnow")
+    rawJobs.push(...(await fetchArbeitnow()));
+  if (!sourceArg || sourceArg === "themuse")
+    rawJobs.push(...(await fetchTheMuse()));
+  if (!sourceArg || sourceArg === "adzuna")
+    rawJobs.push(...(await fetchAdzuna()));
 
   console.log(`\n📊 Total raw jobs fetched: ${rawJobs.length}`);
 
-  // Deduplicate
   const existingIds = await filterExistingIds(rawJobs.map((j) => j.id));
   const newJobs = rawJobs.filter((j) => !existingIds.has(j.id));
 
+  console.log(
+    `   → ${existingIds.size} duplicates skipped, ${newJobs.length} new`,
+  );
+
   await bulkIndex(newJobs);
 
-  // Final count
   const countResult = await esClient.count({ index: ES_INDEX });
   console.log(`\n📈 Total jobs in index: ${countResult.count}`);
 
