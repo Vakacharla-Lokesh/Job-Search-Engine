@@ -1,0 +1,147 @@
+// src/components/JobDetailPanel.tsx
+import { useQuery } from "@tanstack/react-query";
+import { getJob } from "@/lib/api";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import { MapPin, Building2, ExternalLink } from "lucide-react";
+
+interface Props {
+  jobId: string | null;
+  onClose: () => void;
+}
+
+function formatSalary(min: number | null, max: number | null): string | null {
+  if (!min && !max) return null;
+  const fmt = (n: number) =>
+    n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${n}`;
+  if (min && max) return `${fmt(min)} – ${fmt(max)}`;
+  if (min) return `${fmt(min)}+`;
+  return `up to ${fmt(max!)}`;
+}
+
+function DetailSkeleton() {
+  return (
+    <div className="space-y-4 p-4">
+      <Skeleton className="h-6 w-3/4" />
+      <Skeleton className="h-4 w-1/2" />
+      <Skeleton className="h-4 w-1/3" />
+      <Separator />
+      <div className="space-y-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton
+            key={i}
+            className="h-3 w-full"
+          />
+        ))}
+        <Skeleton className="h-3 w-2/3" />
+      </div>
+    </div>
+  );
+}
+
+export default function JobDetailPanel({ jobId, onClose }: Props) {
+  const { data: job, isLoading } = useQuery({
+    queryKey: ["job", jobId],
+    queryFn: () => getJob(jobId!),
+    enabled: jobId !== null,
+    staleTime: 1000 * 60 * 5, // 5 min — job details don't change often
+  });
+
+  const salary = job ? formatSalary(job.salary_min, job.salary_max) : null;
+
+  return (
+    <Sheet
+      open={jobId !== null}
+      onOpenChange={(open) => !open && onClose()}
+    >
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-lg overflow-y-auto p-0"
+      >
+        {isLoading && <DetailSkeleton />}
+
+        {job && (
+          <>
+            <SheetHeader className="p-6 pb-4">
+              <SheetTitle className="text-lg leading-snug">
+                {job.title}
+              </SheetTitle>
+              <SheetDescription asChild>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="size-3.5" />
+                    {job.company}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="size-3.5" />
+                    {job.location}
+                  </span>
+                  {salary && (
+                    <span className="font-medium text-foreground">
+                      {salary}
+                    </span>
+                  )}
+                  {job.remote && <Badge variant="secondary">Remote</Badge>}
+                </div>
+              </SheetDescription>
+            </SheetHeader>
+
+            <Separator />
+
+            {job.skills.length > 0 && (
+              <div className="px-6 py-4 space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Skills
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {job.skills.map((skill) => (
+                    <Badge
+                      key={skill}
+                      variant="outline"
+                    >
+                      {skill}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Separator />
+
+            <div className="px-6 py-4 space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Description
+              </p>
+              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground">
+                {job.description}
+              </pre>
+            </div>
+
+            <Separator />
+
+            <div className="px-6 py-4">
+              <a
+                href={job.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Apply on{" "}
+                {job.source === "remotive" ? "Remotive" : "Hacker News"}
+                <ExternalLink className="size-3.5" />
+              </a>
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}

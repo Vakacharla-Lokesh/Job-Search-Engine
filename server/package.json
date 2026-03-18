@@ -4,8 +4,8 @@
   "description": "Job search engine project",
   "type": "module",
   "scripts": {
-    "dev": "bun run --watch src/index.ts",
-    "start": "bun run src/index.ts",
+    "dev": "bun run --watch index.ts",
+    "start": "bun run index.ts",
     "typecheck": "tsc --noEmit",
     "setup-index": "bun run src/scripts/setup-index.ts",
     "ingest": "bun run src/scripts/ingest.ts",
@@ -13,7 +13,13 @@
     "ingest:hn": "bun run src/scripts/ingest.ts --source hn"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
     "@types/bun": "latest",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/morgan": "^1.9.10",
     "@types/node": "^25.5.0"
   },
   "peerDependencies": {
@@ -21,7 +27,17 @@
   },
   "dependencies": {
     "@elastic/elasticsearch": "^9.3.4",
+    "bcryptjs": "^3.0.3",
+    "bullmq": "^5.71.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
     "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.3.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.3.1",
+    "morgan": "^1.10.1",
     "zod": "^4.3.6"
   }
 }
