@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { MapPin, Building2, ExternalLink } from "lucide-react";
+import { formatSalary } from "@/lib/utils";
 
 interface Props {
   jobId: string | null;
@@ -25,15 +26,6 @@ const SOURCE_LABELS: Record<string, string> = {
   themuse: "The Muse",
   adzuna: "Adzuna",
 };
-
-function formatSalary(min: number | null, max: number | null): string | null {
-  if (!min && !max) return null;
-  const fmt = (n: number) =>
-    n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${n}`;
-  if (min && max) return `${fmt(min)} – ${fmt(max)}`;
-  if (min) return `${fmt(min)}+`;
-  return `up to ${fmt(max!)}`;
-}
 
 function DetailSkeleton() {
   return (

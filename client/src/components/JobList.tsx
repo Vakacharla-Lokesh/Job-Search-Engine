@@ -13,6 +13,7 @@ interface Props {
   total: number;
   isLoading: boolean;
   onSelectJob: (id: string) => void;
+  scores?: Map<string, number>; // undefined = no resume loaded
 }
 
 function JobCardSkeleton() {
@@ -39,6 +40,7 @@ export default function JobList({
   total,
   isLoading,
   onSelectJob,
+  scores,
 }: Props) {
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -91,6 +93,7 @@ export default function JobList({
               <JobCard
                 job={job}
                 onSelect={() => onSelectJob(job.id)}
+                matchScore={scores?.get(job.id)}
               />
             </div>
           );

@@ -3,12 +3,14 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { JobDocument } from "@/types/job";
 import { MapPin, Building2, Clock } from "lucide-react";
+import MatchBadge from "@/components/MatchBadge";
 
 type Job = Omit<JobDocument, "embedding">;
 
 interface Props {
   job: Job;
   onSelect: () => void;
+  matchScore?: number; // undefined = no resume loaded
 }
 
 function formatSalary(min: number | null, max: number | null): string | null {
@@ -32,7 +34,7 @@ function timeAgo(iso: string): string {
 
 const MAX_VISIBLE_SKILLS = 4;
 
-export default function JobCard({ job, onSelect }: Props) {
+export default function JobCard({ job, onSelect, matchScore }: Props) {
   const salary = formatSalary(job.salary_min, job.salary_max);
   const visibleSkills = job.skills.slice(0, MAX_VISIBLE_SKILLS);
   const extraSkills = job.skills.length - MAX_VISIBLE_SKILLS;
@@ -60,6 +62,7 @@ export default function JobCard({ job, onSelect }: Props) {
           </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
+          <MatchBadge score={matchScore} />
           {job.remote && <Badge variant="secondary">Remote</Badge>}
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="size-3" />
