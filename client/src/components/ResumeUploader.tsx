@@ -43,8 +43,6 @@ async function extractTextFromPdf(file: File): Promise<string> {
   return pages.join("\n");
 }
 
-export type { WorkerStatus };
-
 export default function ResumeUploader({
   status,
   hasResume,

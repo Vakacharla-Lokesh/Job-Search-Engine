@@ -1,39 +1,29 @@
 // client/src/hooks/useResumeScoring.ts
-//
-// Manages the Web Worker lifecycle and exposes a clean API to the UI layer.
-// This hook is the single owner of the worker — it creates it, receives all
-// messages from it, and tears it down on unmount.
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { JobDocument } from "@/types/job";
 import type { WorkerOutboundMessage } from "@/types/worker";
-
-// Vite's ?worker import — produces a Worker constructor, not an instance
 import ResumeWorker from "@/workers/resume.worker?worker";
 
 export type WorkerStatus =
-  | "initializing" // worker spawned, model loading
-  | "ready" // model loaded, waiting for resume
-  | "embedding" // resume being embedded
-  | "scoring" // jobs being scored
-  | "idle" // resume loaded, scores computed, at rest
+  | "initializing"
+  | "ready"
+  | "embedding"
+  | "scoring"
+  | "idle"
   | "error";
 
 export interface ResumeScoringState {
   status: WorkerStatus;
-  /** Map of jobId → score (0–100). Empty until first SCORE_JOBS completes. */
   scores: Map<string, number>;
   errorMessage: string | null;
-  /** Call with raw resume text (already extracted from PDF or paste) */
   loadResume: (text: string) => void;
-  /** Call whenever visible jobs change to trigger re-scoring */
   scoreJobs: (
     jobs: Array<Pick<JobDocument, "id" | "title" | "description" | "skills">>,
   ) => void;
-  /** True once the model is loaded and ready to accept a resume */
   isModelReady: boolean;
-  /** True if a resume has been loaded and scores are available */
   hasResume: boolean;
+  /** Call this when the user clears their resume */
+  clearResume: () => void;
 }
 
 export function useResumeScoring(): ResumeScoringState {
@@ -41,9 +31,9 @@ export function useResumeScoring(): ResumeScoringState {
   const [status, setStatus] = useState<WorkerStatus>("initializing");
   const [scores, setScores] = useState<Map<string, number>>(new Map());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const hasResumeRef = useRef(false);
+  // FIXED: useState instead of useRef — hasResume must trigger re-renders
+  const [hasResume, setHasResume] = useState(false);
 
-  // Spawn the worker once on mount
   useEffect(() => {
     const worker = new ResumeWorker();
     workerRef.current = worker;
@@ -57,7 +47,8 @@ export function useResumeScoring(): ResumeScoringState {
           break;
 
         case "RESUME_LOADED":
-          hasResumeRef.current = true;
+          // FIXED: state update — causes SearchPage's useEffect to re-fire
+          setHasResume(true);
           setStatus("idle");
           break;
 
@@ -95,12 +86,11 @@ export function useResumeScoring(): ResumeScoringState {
     (
       jobs: Array<Pick<JobDocument, "id" | "title" | "description" | "skills">>,
     ) => {
-      if (!workerRef.current || !hasResumeRef.current) return;
+      if (!workerRef.current) return;
       setStatus("scoring");
 
       const jobPayload = jobs.map((j) => ({
         id: j.id,
-        // Concatenate searchable fields — same strategy as server-side ingestion
         text: [j.title, j.skills.join(" "), j.description.slice(0, 500)].join(
           " ",
         ),
@@ -111,13 +101,22 @@ export function useResumeScoring(): ResumeScoringState {
     [],
   );
 
+  // FIXED: clearResume resets hasResume state and scores so SearchPage can
+  // correctly detect the transition from cleared → re-uploaded
+  const clearResume = useCallback(() => {
+    setHasResume(false);
+    setScores(new Map());
+    setStatus("ready");
+  }, []);
+
   return {
     status,
     scores,
     errorMessage,
     loadResume,
     scoreJobs,
+    clearResume,
     isModelReady: status !== "initializing",
-    hasResume: hasResumeRef.current,
+    hasResume,
   };
 }

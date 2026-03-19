@@ -4,22 +4,14 @@ import { Separator } from "@/components/ui/separator";
 import type { JobDocument } from "@/types/job";
 import { MapPin, Building2, Clock } from "lucide-react";
 import MatchBadge from "@/components/MatchBadge";
+import { formatSalary } from "@/lib/utils";
 
 type Job = Omit<JobDocument, "embedding">;
 
 interface Props {
   job: Job;
   onSelect: () => void;
-  matchScore?: number; // undefined = no resume loaded
-}
-
-function formatSalary(min: number | null, max: number | null): string | null {
-  if (!min && !max) return null;
-  const fmt = (n: number) =>
-    n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${n}`;
-  if (min && max) return `${fmt(min)} – ${fmt(max)}`;
-  if (min) return `${fmt(min)}+`;
-  return `up to ${fmt(max!)}`;
+  matchScore?: number;
 }
 
 function timeAgo(iso: string): string {

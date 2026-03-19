@@ -7,6 +7,7 @@
 //   3. Embedding each job's text and computing cosine similarity vs the resume
 
 import * as tf from "@tensorflow/tfjs";
+import "@tensorflow/tfjs-backend-wasm"; // registers the WASM backend into the TF.js registry
 import * as use from "@tensorflow-models/universal-sentence-encoder";
 import type {
   WorkerInboundMessage,

@@ -13,10 +13,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { MapPin, Building2, ExternalLink } from "lucide-react";
 import { formatSalary } from "@/lib/utils";
+import SkillGapSidebar from "@/components/SkillGapSidebar";
 
 interface Props {
   jobId: string | null;
   onClose: () => void;
+  matchScore?: number; // undefined = no resume loaded
+  resumeText?: string; // undefined = no resume loaded
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -47,15 +50,25 @@ function DetailSkeleton() {
   );
 }
 
-export default function JobDetailPanel({ jobId, onClose }: Props) {
+export default function JobDetailPanel({
+  jobId,
+  onClose,
+  matchScore,
+  resumeText,
+}: Props) {
   const { data: job, isLoading } = useQuery({
     queryKey: ["job", jobId],
     queryFn: () => getJob(jobId!),
     enabled: jobId !== null,
-    staleTime: 1000 * 60 * 5, // 5 min — job details don't change often
+    staleTime: 1000 * 60 * 5,
   });
 
   const salary = job ? formatSalary(job.salary_min, job.salary_max) : null;
+  const showSkillGap =
+    job !== undefined &&
+    matchScore !== undefined &&
+    resumeText !== undefined &&
+    job.skills.length > 0;
 
   return (
     <Sheet
@@ -96,25 +109,39 @@ export default function JobDetailPanel({ jobId, onClose }: Props) {
 
             <Separator />
 
-            {job.skills.length > 0 && (
-              <div className="px-6 py-4 space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Skills
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {job.skills.map((skill) => (
-                    <Badge
-                      key={skill}
-                      variant="outline"
-                    >
-                      {skill}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
+            {/* Skill gap — only when resume is loaded */}
+            {showSkillGap && (
+              <>
+                <SkillGapSidebar
+                  jobSkills={job.skills}
+                  resumeText={resumeText!}
+                  matchScore={matchScore!}
+                />
+                <Separator />
+              </>
             )}
 
-            <Separator />
+            {/* Skills list — only when no resume (skill gap replaces it) */}
+            {!showSkillGap && job.skills.length > 0 && (
+              <>
+                <div className="px-6 py-4 space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Skills
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {job.skills.map((skill) => (
+                      <Badge
+                        key={skill}
+                        variant="outline"
+                      >
+                        {skill}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                <Separator />
+              </>
+            )}
 
             <div className="px-6 py-4 space-y-2">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

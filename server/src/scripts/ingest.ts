@@ -271,6 +271,7 @@ async function fetchArbeitnow(): Promise<JobDocument[]> {
 
     for (const job of data.data) {
       const description = stripHtml(job.description);
+      const parsedDate = new Date(job.publication_date);
       jobs.push({
         id: urlToId(job.url),
         title: job.title,
@@ -282,7 +283,9 @@ async function fetchArbeitnow(): Promise<JobDocument[]> {
         salary_max: null,
         skills: extractSkills(description),
         source_url: job.url,
-        posted_at: new Date(job.publication_date).toISOString(),
+        posted_at: isNaN(parsedDate.getTime())
+          ? new Date().toISOString()
+          : parsedDate.toISOString(),
         source: "arbeitnow",
       });
     }
