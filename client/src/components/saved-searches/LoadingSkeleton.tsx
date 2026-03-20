@@ -1,4 +1,3 @@
-// client/src/components/saved-searches/LoadingSkeleton.tsx
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function LoadingSkeleton() {

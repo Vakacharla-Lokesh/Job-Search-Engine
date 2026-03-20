@@ -1,4 +1,3 @@
-// client/src/components/saved-searches/SavedSearchCard.tsx
 import { Link } from "react-router";
 import { Trash2, Search, MapPin, DollarSign, Wifi, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,7 +23,6 @@ export function SavedSearchCard({
     filters.salary_min !== null ||
     filters.remote !== null;
 
-  // Build the URL that takes the user back to search with these filters applied
   const searchParams = new URLSearchParams();
   if (savedSearch.query) searchParams.set("q", savedSearch.query);
   if (filters.location.length > 0)

@@ -21,7 +21,6 @@ export interface ResumeScoringState {
   ) => void;
   isModelReady: boolean;
   hasResume: boolean;
-  /** Call this when the user clears their resume */
   clearResume: () => void;
 }
 

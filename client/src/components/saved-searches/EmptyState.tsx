@@ -1,4 +1,3 @@
-// client/src/components/saved-searches/EmptyState.tsx
 import { Search } from "lucide-react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";

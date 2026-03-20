@@ -1,4 +1,3 @@
-// client/src/components/saved-searches/UnauthenticatedState.tsx
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 

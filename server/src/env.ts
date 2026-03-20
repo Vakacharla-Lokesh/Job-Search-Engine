@@ -41,6 +41,9 @@ const _env = {
   PORT: parseInt(optionalEnv("PORT", "3000"), 10),
   NODE_ENV: optionalEnv("NODE_ENV", "development"),
 
+  // CORS
+  CORS_ORIGIN: optionalEnv("CORS_ORIGIN", "http://localhost:5173"),
+
   // Adzuna
   ADZUNA_APP_ID: optionalEnv("ADZUNA_APP_ID", ""),
   ADZUNA_APP_KEY: optionalEnv("ADZUNA_APP_KEY", ""),
@@ -98,6 +101,11 @@ export const env = {
   },
   get isProd() {
     return _env.NODE_ENV === "production";
+  },
+
+  // cors
+  get corsOrigin() {
+    return _env.CORS_ORIGIN;
   },
 
   // Adzuna

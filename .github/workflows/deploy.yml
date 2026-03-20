@@ -1,0 +1,51 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install & typecheck server
+        working-directory: server
+        run: |
+          bun install --frozen-lockfile
+          bun run typecheck
+
+      - name: Install & build client
+        working-directory: client
+        run: |
+          bun install --frozen-lockfile
+          bun run typecheck
+          bun run build
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /var/www/job-search-engine
+            git pull origin main
+            cd server && bun install --frozen-lockfile
+            pm2 reload api --update-env
+            pm2 reload workers --update-env
+            # Sync built client (built in CI, rsync'd separately)
+
+      - name: Sync client build
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "client/dist/*"
+          target: "/var/www/job-search-engine/client/dist/"
