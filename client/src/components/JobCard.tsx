@@ -1,7 +1,7 @@
 // src/components/JobCard.tsx
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import type { JobDocument } from "@/types/job";
+import type { JobDocument } from "@/types/job.interfaces";
 import { MapPin, Building2, Clock } from "lucide-react";
 import MatchBadge from "@/components/MatchBadge";
 import { formatSalary } from "@/lib/utils";

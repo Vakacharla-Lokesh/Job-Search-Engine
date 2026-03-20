@@ -1,8 +1,3 @@
-// client/src/components/MatchBadge.tsx
-//
-// Displays a resume match score (0–100) as a colour-coded badge.
-// Renders nothing if score is undefined — clean no-resume fallback.
-
 interface Props {
   score: number | undefined;
 }

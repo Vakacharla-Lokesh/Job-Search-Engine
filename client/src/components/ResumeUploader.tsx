@@ -1,17 +1,9 @@
-// client/src/components/ResumeUploader.tsx
-//
-// Handles resume input (PDF upload or text paste) and text extraction.
-// Extracted text is passed up to the parent via onResumeText().
-// PDF parsing runs on the main thread via pdfjs-dist; the worker only
-// receives the resulting plain text string.
-
 import { useCallback, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
 import { FileText, UploadCloud, X, Loader2, AlertCircle } from "lucide-react";
 import type { WorkerStatus } from "@/hooks/useResumeScoring";
 
-// Must be set before any getDocument() call
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
 const MAX_FILE_SIZE_MB = 5;
@@ -100,7 +92,6 @@ export default function ResumeUploader({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) void handleFile(file);
-      // Reset so re-uploading same file triggers onChange
       e.target.value = "";
     },
     [handleFile],
@@ -131,7 +122,6 @@ export default function ResumeUploader({
 
   const displayError = parseError ?? errorMessage;
 
-  // ── Loaded state ──────────────────────────────────────────────────────────
   if (hasResume && fileName) {
     return (
       <div className="rounded-lg border border-border bg-card px-4 py-3">
@@ -162,7 +152,6 @@ export default function ResumeUploader({
     );
   }
 
-  // ── Upload state ──────────────────────────────────────────────────────────
   return (
     <div className="space-y-2">
       <button

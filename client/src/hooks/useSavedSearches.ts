@@ -1,4 +1,3 @@
-// client/src/hooks/useSavedSearches.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   listSavedSearches,
@@ -13,7 +12,6 @@ export function useSavedSearches() {
   return useQuery({
     queryKey: SAVED_SEARCHES_KEY,
     queryFn: listSavedSearches,
-    // 401 means unauthenticated — don't retry, surface it immediately
     retry: (failureCount, error) => {
       if ((error as Error).message.startsWith("Unauthorized")) return false;
       return failureCount < 1;

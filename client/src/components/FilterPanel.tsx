@@ -1,4 +1,3 @@
-// src/components/FilterPanel.tsx
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -18,7 +17,6 @@ export default function FilterPanel({ filters, setFilters }: Props) {
   const [localLocation, setLocalLocation] = useState(filters.location ?? "");
   const [localSalary, setLocalSalary] = useState(filters.salary_min ?? 0);
 
-  // Keep local state in sync with URL (back/forward nav)
   useEffect(() => {
     setLocalLocation(filters.location ?? "");
   }, [filters.location]);
@@ -26,7 +24,6 @@ export default function FilterPanel({ filters, setFilters }: Props) {
     setLocalSalary(filters.salary_min ?? 0);
   }, [filters.salary_min]);
 
-  // Debounce location → URL
   useEffect(() => {
     const timer = setTimeout(() => {
       const current = filters.location ?? "";
@@ -35,9 +32,8 @@ export default function FilterPanel({ filters, setFilters }: Props) {
       }
     }, DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [localLocation]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [localLocation]);
 
-  // Debounce salary → URL
   useEffect(() => {
     const timer = setTimeout(() => {
       const current = filters.salary_min ?? 0;
@@ -46,7 +42,7 @@ export default function FilterPanel({ filters, setFilters }: Props) {
       }
     }, DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [localSalary]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [localSalary]);
 
   return (
     <div className="space-y-5 rounded-lg border border-border p-4">

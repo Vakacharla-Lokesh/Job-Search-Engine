@@ -1,6 +1,3 @@
-// src/components/SaveSearchModal.tsx
-// Triggered from SearchPage. Captures a name for the current search filters
-// and POSTs to /saved-searches.
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,13 +26,12 @@ export default function SaveSearchModal({ filters, onClose }: Props) {
         },
       });
       onClose();
-    } catch {
-      // error surfaced via createMutation.error below
+    } catch (error) {
+      console.error("Error saving search:", error);
     }
   };
 
   return (
-    // Backdrop
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={onClose}

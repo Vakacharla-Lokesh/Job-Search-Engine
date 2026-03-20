@@ -1,7 +1,7 @@
 // src/components/JobList.tsx
 import { useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import type { JobDocument } from "@/types/job";
+import type { JobDocument } from "@/types/job.interfaces";
 import JobCard from "@/components/JobCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SearchX } from "lucide-react";

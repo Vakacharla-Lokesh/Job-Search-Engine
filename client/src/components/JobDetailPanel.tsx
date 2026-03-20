@@ -1,4 +1,3 @@
-// src/components/JobDetailPanel.tsx
 import { useQuery } from "@tanstack/react-query";
 import { getJob } from "@/lib/api";
 import {
@@ -18,8 +17,8 @@ import SkillGapSidebar from "@/components/SkillGapSidebar";
 interface Props {
   jobId: string | null;
   onClose: () => void;
-  matchScore?: number; // undefined = no resume loaded
-  resumeText?: string; // undefined = no resume loaded
+  matchScore?: number;
+  resumeText?: string;
 }
 
 const SOURCE_LABELS: Record<string, string> = {

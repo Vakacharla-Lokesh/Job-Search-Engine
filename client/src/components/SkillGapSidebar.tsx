@@ -1,18 +1,11 @@
-// client/src/components/SkillGapSidebar.tsx
-//
-// Shows a skill gap breakdown for a job when a resume is loaded.
-// "Matched" = skill keyword appears in resume text (case-insensitive).
-// "Missing" = skill keyword not found in resume text.
-// This is keyword matching, not semantic — fast, transparent, explainable.
-
 import { Badge } from "@/components/ui/badge";
 import MatchBadge from "@/components/MatchBadge";
 import { CheckCircle2, XCircle } from "lucide-react";
 
 interface Props {
   jobSkills: string[];
-  resumeText: string; // raw resume text, for keyword matching
-  matchScore: number; // 0–100, from the worker
+  resumeText: string; 
+  matchScore: number;
 }
 
 function normalise(s: string): string {
@@ -25,7 +18,6 @@ function normalise(s: string): string {
 function skillInResume(skill: string, resumeText: string): boolean {
   const normSkill = normalise(skill);
   const normResume = normalise(resumeText);
-  // Multi-word skills: require all words present, in any order
   const words = normSkill.split(/\s+/).filter(Boolean);
   return words.every((word) => normResume.includes(word));
 }

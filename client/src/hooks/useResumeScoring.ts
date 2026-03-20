@@ -1,7 +1,6 @@
-// client/src/hooks/useResumeScoring.ts
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { JobDocument } from "@/types/job";
-import type { WorkerOutboundMessage } from "@/types/worker";
+import type { JobDocument } from "@/types/job.interfaces";
+import type { WorkerOutboundMessage } from "@/types/worker.interfaces";
 import ResumeWorker from "@/workers/resume.worker?worker";
 
 export type WorkerStatus =
@@ -31,7 +30,6 @@ export function useResumeScoring(): ResumeScoringState {
   const [status, setStatus] = useState<WorkerStatus>("initializing");
   const [scores, setScores] = useState<Map<string, number>>(new Map());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  // FIXED: useState instead of useRef — hasResume must trigger re-renders
   const [hasResume, setHasResume] = useState(false);
 
   useEffect(() => {
@@ -47,7 +45,6 @@ export function useResumeScoring(): ResumeScoringState {
           break;
 
         case "RESUME_LOADED":
-          // FIXED: state update — causes SearchPage's useEffect to re-fire
           setHasResume(true);
           setStatus("idle");
           break;
@@ -101,8 +98,6 @@ export function useResumeScoring(): ResumeScoringState {
     [],
   );
 
-  // FIXED: clearResume resets hasResume state and scores so SearchPage can
-  // correctly detect the transition from cleared → re-uploaded
   const clearResume = useCallback(() => {
     setHasResume(false);
     setScores(new Map());

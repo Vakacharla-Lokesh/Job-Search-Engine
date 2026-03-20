@@ -1,6 +1,3 @@
-// client/src/types/worker.ts
-
-/** Messages sent FROM the main thread TO the worker */
 export type WorkerInboundMessage =
   | {
       type: "LOAD_RESUME";
@@ -11,7 +8,6 @@ export type WorkerInboundMessage =
       jobs: Array<{ id: string; text: string }>;
     };
 
-/** Messages sent FROM the worker TO the main thread */
 export type WorkerOutboundMessage =
   | { type: "READY" }
   | { type: "RESUME_LOADED" }

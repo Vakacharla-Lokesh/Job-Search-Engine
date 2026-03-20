@@ -1,4 +1,3 @@
-// src/components/SearchBar.tsx
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
@@ -14,12 +13,10 @@ const DEBOUNCE_MS = 300;
 export default function SearchBar({ filters, setFilters }: Props) {
   const [localValue, setLocalValue] = useState(filters.q);
 
-  // Sync local value if URL changes externally (e.g. back/forward nav)
   useEffect(() => {
     setLocalValue(filters.q);
   }, [filters.q]);
 
-  // Debounce: write to URL 300ms after user stops typing
   useEffect(() => {
     const timer = setTimeout(() => {
       if (localValue !== filters.q) {
@@ -27,7 +24,7 @@ export default function SearchBar({ filters, setFilters }: Props) {
       }
     }, DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [localValue]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [localValue]);
 
   return (
     <div className="relative">

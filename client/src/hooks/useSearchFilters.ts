@@ -1,4 +1,3 @@
-// hooks/useSearchFilters.ts
 import { useSearchParams } from "react-router";
 import { z } from "zod";
 import { useCallback } from "react";
@@ -28,7 +27,7 @@ export function useSearchFilters() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const raw = Object.fromEntries(searchParams.entries());
-  const filters = searchSchema.parse(raw); // safe: all fields have defaults
+  const filters = searchSchema.parse(raw);
 
   const setFilters = useCallback(
     (update: Partial<SearchFilters>) => {

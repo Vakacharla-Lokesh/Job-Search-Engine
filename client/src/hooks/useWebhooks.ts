@@ -1,4 +1,3 @@
-// client/src/hooks/useWebhooks.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   listWebhooks,
@@ -28,7 +27,6 @@ export function useWebhookDeliveries(subscriptionId: string | null) {
   return useQuery({
     queryKey: ["webhooks", subscriptionId, "deliveries"] as const,
     queryFn: () => listWebhookDeliveries(subscriptionId!),
-    // Only fetch when a subscription is selected
     enabled: subscriptionId !== null,
     retry: noRetryOn401,
   });
@@ -71,7 +69,6 @@ export function useTestWebhook() {
   return useMutation({
     mutationFn: (id: string) => testWebhook(id),
     onSuccess: (_data, id) => {
-      // Refresh delivery log for this subscription after a test fires
       void queryClient.invalidateQueries({
         queryKey: ["webhooks", id, "deliveries"],
       });
