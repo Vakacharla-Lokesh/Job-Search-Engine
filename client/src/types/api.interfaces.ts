@@ -1,14 +1,5 @@
 import type { JobDocument } from "@/types/job.interfaces";
 
-export interface JobSearchParams {
-  q?: string;
-  location?: string;
-  remote?: boolean;
-  salary_min?: number;
-  sort?: "relevance" | "date" | "salary";
-  page?: number;
-}
-
 export interface JobSearchResult {
   hits: Omit<JobDocument, "embedding">[];
   total: number;

@@ -19,6 +19,24 @@ const searchSchema = z.object({
     z.number().int().min(1).default(1),
   ),
   jobId: z.string().optional(),
+  job_type: z
+    .enum(["full_time", "part_time", "contract", "internship"])
+    .optional(),
+  experience_level: z.enum(["entry", "mid", "senior", "lead"]).optional(),
+  skills: z
+    .string()
+    .optional()
+    .transform((v) =>
+      v
+        ? v
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined,
+    ),
+  source: z
+    .enum(["remotive", "hn", "arbeitnow", "themuse", "adzuna"])
+    .optional(),
 });
 
 export type SearchFilters = z.infer<typeof searchSchema>;
@@ -36,6 +54,9 @@ export function useSearchFilters() {
         for (const [k, v] of Object.entries(update)) {
           if (v === undefined || v === null || v === "") {
             next.delete(k);
+          } else if (Array.isArray(v)) {
+            if (v.length === 0) next.delete(k);
+            else next.set(k, v.join(","));
           } else {
             next.set(k, String(v));
           }

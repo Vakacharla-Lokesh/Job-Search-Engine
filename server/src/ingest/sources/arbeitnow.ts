@@ -1,6 +1,5 @@
-// src/ingest/sources/arbeitnow.ts
 import { stripHtml, urlToId, extractSkills } from "@/ingest/pipeline";
-import type { JobDocument } from "@/types/job";
+import type { JobDocument, JobType } from "@/types/job";
 
 interface ArbeitnowJob {
   slug: string;
@@ -19,6 +18,17 @@ interface ArbeitnowResponse {
   data: ArbeitnowJob[];
 }
 
+function normalizeJobType(types: string[]): JobType | undefined {
+  const raw = types[0]?.toLowerCase().replace(/[\s-]+/g, "_") ?? "";
+  const map: Record<string, JobType> = {
+    full_time: "full_time",
+    part_time: "part_time",
+    contract: "contract",
+    internship: "internship",
+  };
+  return map[raw];
+}
+
 export async function fetchArbeitnow(): Promise<JobDocument[]> {
   const jobs: JobDocument[] = [];
 
@@ -34,8 +44,9 @@ export async function fetchArbeitnow(): Promise<JobDocument[]> {
     for (const job of data.data) {
       const description = stripHtml(job.description);
       const parsedDate = new Date(job.publication_date);
+      const job_type = normalizeJobType(job.job_types);
 
-      jobs.push({
+      const doc: JobDocument = {
         id: urlToId(job.url),
         title: job.title,
         description,
@@ -50,7 +61,11 @@ export async function fetchArbeitnow(): Promise<JobDocument[]> {
           ? new Date().toISOString()
           : parsedDate.toISOString(),
         source: "arbeitnow",
-      });
+      };
+
+      if (job_type) doc.job_type = job_type;
+
+      jobs.push(doc);
     }
   }
 

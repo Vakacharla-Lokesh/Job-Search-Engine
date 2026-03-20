@@ -25,10 +25,16 @@ async function createJobsIndex(): Promise<void> {
         remote: { type: "boolean" },
         salary_min: { type: "integer" },
         salary_max: { type: "integer" },
-        skills: { type: "text", analyzer: "english" },
+        skills: {
+          type: "text",
+          analyzer: "english",
+          fields: { keyword: { type: "keyword" } },
+        },
         source_url: { type: "keyword" },
         posted_at: { type: "date" },
-        source: { type: "keyword" }, // 'remotive' | 'hn'
+        source: { type: "keyword" },
+        job_type: { type: "keyword" },
+        experience_level: { type: "keyword" },
         embedding: {
           type: "dense_vector",
           dims: env.embeddingDims,
@@ -51,9 +57,7 @@ async function createPercolatorIndex(): Promise<void> {
     index: env.esPercolatorIndex,
   });
   if (exists) {
-    console.log(
-      `Index "${env.esPercolatorIndex}" already exists — skipping`,
-    );
+    console.log(`Index "${env.esPercolatorIndex}" already exists — skipping`);
     return;
   }
 

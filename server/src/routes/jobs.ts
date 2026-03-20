@@ -1,3 +1,4 @@
+// server/src/routes/jobs.ts
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { searchJobs, getJobById } from "@/services/jobService";
@@ -12,6 +13,24 @@ const searchSchema = z.object({
   salary_min: z.coerce.number().int().nonnegative().optional(),
   sort: z.enum(["relevance", "date", "salary"]).default("relevance"),
   page: z.coerce.number().int().min(1).default(1),
+  job_type: z
+    .enum(["full_time", "part_time", "contract", "internship"])
+    .optional(),
+  experience_level: z.enum(["entry", "mid", "senior", "lead"]).optional(),
+  skills: z
+    .string()
+    .optional()
+    .transform((v) =>
+      v
+        ? v
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined,
+    ),
+  source: z
+    .enum(["remotive", "hn", "arbeitnow", "themuse", "adzuna"])
+    .optional(),
 });
 
 router.get("/search", async (req: Request, res: Response) => {

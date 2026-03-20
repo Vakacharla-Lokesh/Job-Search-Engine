@@ -1,3 +1,6 @@
+export type JobType = "full_time" | "part_time" | "contract" | "internship";
+export type ExperienceLevel = "entry" | "mid" | "senior" | "lead";
+
 export interface JobDocument {
   id: string;
   title: string;
@@ -11,5 +14,7 @@ export interface JobDocument {
   source_url: string;
   posted_at: string;
   source: "remotive" | "hn" | "arbeitnow" | "themuse" | "adzuna";
+  job_type?: JobType;
+  experience_level?: ExperienceLevel;
   embedding?: number[];
 }

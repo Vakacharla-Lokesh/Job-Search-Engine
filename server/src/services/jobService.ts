@@ -1,7 +1,7 @@
 import { esClient } from "@/lib/elasticsearch";
 import { embed } from "@/lib/embedder";
 import { env } from "@/env";
-import type { JobDocument } from "@/types/job";
+import type { JobDocument, JobType, ExperienceLevel } from "@/types/job";
 
 export interface JobSearchParams {
   q: string;
@@ -10,6 +10,10 @@ export interface JobSearchParams {
   salary_min?: number;
   sort?: "relevance" | "date" | "salary";
   page?: number;
+  job_type?: JobType;
+  experience_level?: ExperienceLevel;
+  skills?: string[];
+  source?: JobDocument["source"];
 }
 
 export interface JobSearchResult {
@@ -19,12 +23,8 @@ export interface JobSearchResult {
 }
 
 const PAGE_SIZE = 50;
-const RRF_K = 60; // standard RRF constant — higher = less aggressive rank fusion
+const RRF_K = 60;
 
-/**
- * Manual RRF: merges two ranked lists by score = 1/(k + rank).
- * Produces identical results to ES native RRF on a free license.
- */
 function rrfMerge(
   bm25Hits: Array<{ id: string; score: number; source: JobDocument }>,
   knnHits: Array<{ id: string; score: number; source: JobDocument }>,
@@ -57,18 +57,26 @@ export async function searchJobs(
     salary_min,
     sort = "relevance",
     page = 1,
+    job_type,
+    experience_level,
+    skills,
+    source,
   } = params;
   const from = (page - 1) * PAGE_SIZE;
 
-  // Build filter clauses (shared by both BM25 and kNN paths)
   const filters: object[] = [];
   if (location) filters.push({ term: { location } });
   if (remote !== undefined) filters.push({ term: { remote } });
   if (salary_min !== undefined)
     filters.push({ range: { salary_min: { gte: salary_min } } });
+  if (job_type) filters.push({ term: { job_type } });
+  if (experience_level) filters.push({ term: { experience_level } });
+  if (skills && skills.length > 0)
+    filters.push({ terms: { "skills.keyword": skills } });
+  if (source) filters.push({ term: { source } });
+
   const hasFilters = filters.length > 0;
 
-  // ── Non-relevance sort: plain BM25 + filter, no kNN needed ────────────────
   if (sort !== "relevance") {
     const sortClause =
       sort === "date"
@@ -108,9 +116,6 @@ export async function searchJobs(
     return { hits, total, page };
   }
 
-  // ── Relevance sort: manual hybrid BM25 + kNN with RRF merge ───────────────
-  // If no query string, skip kNN entirely — a zero vector breaks cosine similarity.
-  // Fall back to BM25-only with filters, which is the correct behaviour for "browse all".
   if (!q) {
     const result = await esClient.search<JobDocument>({
       index: env.esIndex,
@@ -137,7 +142,6 @@ export async function searchJobs(
     return { hits, total, page };
   }
 
-  // q is non-empty — safe to embed and run kNN
   const [queryEmbedding] = await embed([q]);
 
   const [bm25Result, knnResult] = await Promise.all([
