@@ -178,3 +178,87 @@ export async function listDeliveries(
 
   return docs.map((doc) => formatDelivery(doc as unknown as RawDeliveryDoc));
 }
+
+export async function fireTestDelivery(
+  userId: string,
+  subscriptionId: string,
+): Promise<DeliveryResponse> {
+  if (!Types.ObjectId.isValid(subscriptionId)) {
+    throw new Error("Invalid subscriptionId");
+  }
+
+  const sub = await WebhookSubscriptionModel.findOne({
+    _id: new Types.ObjectId(subscriptionId),
+    userId: new Types.ObjectId(userId),
+  })
+    .select("url secret active")
+    .lean();
+
+  if (!sub) throw new Error("Subscription not found");
+
+  const { createHmac } = await import("crypto");
+
+  const testPayload = JSON.stringify({
+    event: "job.match",
+    test: true,
+    job: {
+      id: "test-job-id",
+      title: "Test Job",
+      company: "Test Company",
+      url: "https://example.com/test-job",
+      posted_at: new Date().toISOString(),
+    },
+    deliveredAt: new Date().toISOString(),
+  });
+
+  const signature =
+    "sha256=" +
+    createHmac("sha256", sub.secret).update(testPayload).digest("hex");
+
+  const TIMEOUT_MS = 10_000;
+  let responseStatus: number | null = null;
+  let errorMessage: string | null = null;
+  let success = false;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    let response: Response;
+    try {
+      response = await fetch(sub.url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Webhook-Signature": signature,
+          "User-Agent": "JobSearchEngine-Webhook/1.0",
+        },
+        body: testPayload,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    responseStatus = response.status;
+    success = response.ok;
+    if (!response.ok) errorMessage = `HTTP ${response.status}`;
+  } catch (err) {
+    const isAbort = (err as Error).name === "AbortError";
+    errorMessage = isAbort
+      ? `Timeout after ${TIMEOUT_MS}ms`
+      : (err as Error).message;
+  }
+
+  const doc = await WebhookDeliveryModel.create({
+    subscriptionId: new Types.ObjectId(subscriptionId),
+    jobId: "test-job-id",
+    payload: JSON.parse(testPayload),
+    responseStatus,
+    error: errorMessage,
+    sentAt: new Date(),
+    success,
+  });
+
+  return formatDelivery(doc as unknown as RawDeliveryDoc);
+}

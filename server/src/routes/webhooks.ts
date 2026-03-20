@@ -9,6 +9,7 @@ import {
   deleteSubscription,
   toggleSubscription,
   listDeliveries,
+  fireTestDelivery,
 } from "@/services/webhookService";
 
 const router = Router();
@@ -92,6 +93,26 @@ router.get(
     const userId = req.user!.id;
     const deliveries = await listDeliveries(userId, req.params.id);
     res.status(200).json(deliveries);
+  },
+);
+
+// POST /api/v1/webhooks/:id/test — fire a test delivery immediately (sync, not queued)
+router.post(
+  "/:id/test",
+  async (req: Request<{ id: string }>, res: Response) => {
+    const userId = req.user!.id;
+
+    try {
+      const delivery = await fireTestDelivery(userId, req.params.id);
+      res.status(200).json(delivery);
+    } catch (err) {
+      const message = (err as Error).message;
+      if (message === "Subscription not found") {
+        res.status(404).json({ error: message });
+        return;
+      }
+      res.status(500).json({ error: "Test delivery failed" });
+    }
   },
 );
 

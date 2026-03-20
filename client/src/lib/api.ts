@@ -99,3 +99,63 @@ export function createSavedSearch(
 export function deleteSavedSearch(id: string): Promise<void> {
   return apiFetch<void>(`/saved-searches/${id}`, { method: "DELETE" });
 }
+
+// ─── Webhooks ──────────────────────────────────────────────────────────────────
+
+export interface WebhookSubscription {
+  id: string;
+  savedSearchId: string;
+  url: string;
+  active: boolean;
+  createdAt: string;
+  // Only present immediately after creation — never returned again
+  secret?: string;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  subscriptionId: string;
+  jobId: string;
+  success: boolean;
+  responseStatus: number | null;
+  error: string | null;
+  sentAt: string;
+}
+
+export function listWebhooks(): Promise<WebhookSubscription[]> {
+  return apiFetch<WebhookSubscription[]>("/webhooks");
+}
+
+export function createWebhook(input: {
+  savedSearchId: string;
+  url: string;
+}): Promise<WebhookSubscription> {
+  return apiFetch<WebhookSubscription>("/webhooks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteWebhook(id: string): Promise<void> {
+  return apiFetch<void>(`/webhooks/${id}`, { method: "DELETE" });
+}
+
+export function toggleWebhook(
+  id: string,
+  active: boolean,
+): Promise<WebhookSubscription> {
+  return apiFetch<WebhookSubscription>(`/webhooks/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ active }),
+  });
+}
+
+export function listWebhookDeliveries(id: string): Promise<WebhookDelivery[]> {
+  return apiFetch<WebhookDelivery[]>(`/webhooks/${id}/deliveries`);
+}
+
+export function testWebhook(id: string): Promise<WebhookDelivery> {
+  return apiFetch<WebhookDelivery>(`/webhooks/${id}/test`, { method: "POST" });
+}

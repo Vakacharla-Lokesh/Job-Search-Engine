@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router";
 import RootLayout from "@/components/RootLayout";
 import SearchPage from "@/pages/SearchPage";
 import SavedSearchesPage from "@/pages/SavedSearchesPage";
+import WebhookSettingsPage from "@/pages/WebhookSettingsPage";
 
 export default function App() {
   return (
@@ -23,6 +24,10 @@ export default function App() {
         <Route
           path="/saved-searches"
           element={<SavedSearchesPage />}
+        />
+        <Route
+          path="/settings/webhooks"
+          element={<WebhookSettingsPage />}
         />
       </Route>
     </Routes>
