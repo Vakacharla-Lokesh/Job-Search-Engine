@@ -1,5 +1,6 @@
 // src/pages/SearchPage.tsx
 import { useEffect, useRef, useState } from "react";
+import { Bookmark } from "lucide-react";
 import { useJobSearch } from "@/hooks/useJobSearch";
 import { useSearchFilters } from "@/hooks/useSearchFilters";
 import { useResumeScoring } from "@/hooks/useResumeScoring";
@@ -8,6 +9,8 @@ import FilterPanel from "@/components/FilterPanel";
 import JobList from "@/components/JobList";
 import JobDetailPanel from "@/components/JobDetailPanel";
 import ResumeUploader from "@/components/ResumeUploader";
+import SaveSearchModal from "@/components/SaveSearchModal";
+import { Button } from "@/components/ui/button";
 
 export default function SearchPage() {
   const { filters, setFilters } = useSearchFilters();
@@ -15,6 +18,7 @@ export default function SearchPage() {
   const scoring = useResumeScoring();
 
   const [resumeText, setResumeText] = useState<string | undefined>(undefined);
+  const [showSaveModal, setShowSaveModal] = useState(false);
 
   // Tracks the last set of hit IDs we scored — prevents redundant scoreJobs calls
   const lastScoredHitsRef = useRef<string>("");
@@ -28,13 +32,10 @@ export default function SearchPage() {
     lastScoredHitsRef.current = hitsKey;
 
     scoring.scoreJobs(hits);
-    // scoring.scoreJobs is stable (useCallback []). scoring.hasResume and
-    // data?.hits are the real dependencies that should trigger re-scoring.
   }, [data?.hits, scoring.hasResume, scoring.scoreJobs]);
 
   const handleResumeText = (text: string) => {
     setResumeText(text);
-    // Reset so the useEffect above sees the new hasResume → true transition
     lastScoredHitsRef.current = "";
     scoring.loadResume(text);
   };
@@ -42,7 +43,6 @@ export default function SearchPage() {
   const handleClearResume = () => {
     setResumeText(undefined);
     lastScoredHitsRef.current = "";
-    // Resets hasResume, scores, and status in the hook
     scoring.clearResume();
   };
 
@@ -64,10 +64,25 @@ export default function SearchPage() {
       </aside>
 
       <div className="flex-1 space-y-4">
-        <SearchBar
-          filters={filters}
-          setFilters={setFilters}
-        />
+        <div className="flex items-center gap-2">
+          <div className="flex-1">
+            <SearchBar
+              filters={filters}
+              setFilters={setFilters}
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0 gap-1.5"
+            onClick={() => setShowSaveModal(true)}
+            title="Save this search"
+          >
+            <Bookmark className="size-4" />
+            Save
+          </Button>
+        </div>
+
         {data && (
           <p className="text-sm text-muted-foreground">
             {data.total} jobs found
@@ -90,6 +105,13 @@ export default function SearchPage() {
         }
         resumeText={resumeText}
       />
+
+      {showSaveModal && (
+        <SaveSearchModal
+          filters={filters}
+          onClose={() => setShowSaveModal(false)}
+        />
+      )}
     </div>
   );
 }

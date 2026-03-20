@@ -14,6 +14,7 @@ import jobRoutes from "@/routes/jobs";
 import authRoutes from "@/routes/auth";
 import savedSearchRoutes from "@/routes/savedSearches";
 import webhookRoutes from "@/routes/webhooks";
+import adminRoutes from "@/routes/admin";
 
 export const app = express();
 
@@ -68,6 +69,7 @@ app.use("/api/v1/jobs", jobRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/saved-searches", savedSearchRoutes);
 app.use("/api/v1/webhooks", webhookRoutes);
+app.use("/api/v1/admin", adminRoutes);
 
 // ── Error handler (must be last, after all routes) ────────────────────────────
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

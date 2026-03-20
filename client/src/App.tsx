@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router";
 import RootLayout from "@/components/RootLayout";
 import SearchPage from "@/pages/SearchPage";
+import SavedSearchesPage from "@/pages/SavedSearchesPage";
 
 export default function App() {
   return (
@@ -18,6 +19,10 @@ export default function App() {
         <Route
           path="/search"
           element={<SearchPage />}
+        />
+        <Route
+          path="/saved-searches"
+          element={<SavedSearchesPage />}
         />
       </Route>
     </Routes>

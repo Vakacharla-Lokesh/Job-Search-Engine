@@ -3,6 +3,8 @@ import type { JobDocument } from "@/types/job";
 
 const BASE = import.meta.env.VITE_API_URL as string;
 
+// ─── Job Search ────────────────────────────────────────────────────────────────
+
 export interface JobSearchParams {
   q?: string;
   location?: string;
@@ -18,6 +20,36 @@ export interface JobSearchResult {
   page: number;
 }
 
+// ─── Saved Searches ────────────────────────────────────────────────────────────
+
+export interface SavedSearchFilters {
+  location: string[];
+  salary_min: number | null;
+  remote: boolean | null;
+}
+
+export interface SavedSearch {
+  id: string;
+  name: string;
+  query: string;
+  filters: SavedSearchFilters;
+  percolatorId: string;
+  createdAt: string;
+  lastAlertAt: string | null;
+}
+
+export interface CreateSavedSearchInput {
+  name: string;
+  query: string;
+  filters: {
+    location?: string[];
+    salary_min?: number | null;
+    remote?: boolean | null;
+  };
+}
+
+// ─── Core Fetch ────────────────────────────────────────────────────────────────
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     credentials: "include", // send httpOnly auth cookie
@@ -29,6 +61,8 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   }
   return res.json() as Promise<T>;
 }
+
+// ─── Jobs ──────────────────────────────────────────────────────────────────────
 
 export function searchJobs(params: JobSearchParams): Promise<JobSearchResult> {
   const qs = new URLSearchParams();
@@ -44,4 +78,24 @@ export function searchJobs(params: JobSearchParams): Promise<JobSearchResult> {
 
 export function getJob(id: string): Promise<Omit<JobDocument, "embedding">> {
   return apiFetch(`/jobs/${id}`);
+}
+
+// ─── Saved Searches ────────────────────────────────────────────────────────────
+
+export function listSavedSearches(): Promise<SavedSearch[]> {
+  return apiFetch<SavedSearch[]>("/saved-searches");
+}
+
+export function createSavedSearch(
+  input: CreateSavedSearchInput,
+): Promise<SavedSearch> {
+  return apiFetch<SavedSearch>("/saved-searches", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteSavedSearch(id: string): Promise<void> {
+  return apiFetch<void>(`/saved-searches/${id}`, { method: "DELETE" });
 }

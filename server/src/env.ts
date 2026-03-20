@@ -34,6 +34,9 @@ const _env = {
   JWT_SECRET: requireEnv("JWT_SECRET"),
   JWT_EXPIRES_IN: optionalEnv("JWT_EXPIRES_IN", "7d"),
 
+  // Admin
+  ADMIN_SECRET: requireEnv("ADMIN_SECRET"),
+
   // Server
   PORT: parseInt(optionalEnv("PORT", "3000"), 10),
   NODE_ENV: optionalEnv("NODE_ENV", "development"),
@@ -79,6 +82,11 @@ export const env = {
   },
   get jwtExpiresIn() {
     return _env.JWT_EXPIRES_IN;
+  },
+
+  // Admin
+  get adminSecret() {
+    return _env.ADMIN_SECRET;
   },
 
   // Server
